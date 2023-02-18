@@ -6,21 +6,33 @@ import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.CRServo;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorSimple;
+import com.qualcomm.robotcore.util.ElapsedTime;
 
 @TeleOp
 public class FieldCentricTeleOp extends LinearOpMode {
+
+    public static final double ticksPerMotorRev = 560;
+    public static final double driveGearReduction = 0;
+    // public static final double wheelDiameterInches = 4;
+    // public static final double ticksPerDriveInch = (ticksPerMotorRev * driveGearReduction) / (wheelDiameterInches * 3.14159265359);
+
+    ElapsedTime runtime = new ElapsedTime();
+
+    private DcMotor motorFrontLeft, motorBackLeft, motorFrontRight, motorBackRight;
+
+    private CRServo grabber;
+    private DcMotor lift1, lift2;
+
     @Override
     public void runOpMode() throws InterruptedException {
-        // Declare our motors
-        // Make sure your ID's match your configuration
-        DcMotor motorFrontLeft = hardwareMap.dcMotor.get("LF");
-        DcMotor motorBackLeft = hardwareMap.dcMotor.get("LB");
-        DcMotor motorFrontRight = hardwareMap.dcMotor.get("RF");
-        DcMotor motorBackRight = hardwareMap.dcMotor.get("RB");
+        motorFrontLeft = hardwareMap.dcMotor.get("LF");
+        motorBackLeft = hardwareMap.dcMotor.get("LB");
+        motorFrontRight = hardwareMap.dcMotor.get("RF");
+        motorBackRight = hardwareMap.dcMotor.get("RB");
 
-        CRServo grabber = hardwareMap.crservo.get("grabber");
-        DcMotor lift1 = hardwareMap.dcMotor.get("lift1");
-        DcMotor lift2 = hardwareMap.dcMotor.get("lift2");
+        grabber = hardwareMap.crservo.get("grabber");
+        lift1 = hardwareMap.dcMotor.get("lift1");
+        lift2 = hardwareMap.dcMotor.get("lift2");
 
         // Reverse the right side motors
         // Reverse left motors if you are using NeveRests
@@ -34,6 +46,7 @@ public class FieldCentricTeleOp extends LinearOpMode {
 
         lift1.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
         lift2.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        lift1.setDirection(DcMotorSimple.Direction.REVERSE);
 
         // Retrieve the IMU from the hardware map
         BNO055IMU imu = hardwareMap.get(BNO055IMU.class, "imu");
@@ -85,15 +98,15 @@ public class FieldCentricTeleOp extends LinearOpMode {
             motorBackRight.setPower(backRightPower);
 
             // lift controls
-            double liftUp = 0.6;
-            double liftDown = 0.2;
+            double liftUp = 1;
+            double liftDown = -0.2;
 
             if (gamepad2.right_bumper) {
                 lift1.setPower(liftDown);
-                lift2.setPower(-liftDown);
+                lift2.setPower(liftDown);
 
             } else if (gamepad2.left_bumper) {
-                lift1.setPower(-liftUp);
+                lift1.setPower(liftUp);
                 lift2.setPower(liftUp);
 
             } else {
@@ -101,18 +114,115 @@ public class FieldCentricTeleOp extends LinearOpMode {
                 lift2.setPower(0);
             }
 
-            // grabber controls
-            if (gamepad2.right_trigger > 0) {
-                grabber.setPower(0.5);
-
-            } else if (gamepad2.left_trigger > 0) {
-                grabber.setPower(-0.5);
-
-            } else {
-                grabber.setPower(0);
+            if (gamepad2.a) {
+                autoLift(0);
+            } else if (gamepad2.b) {
+                autoLift(1);
+            }
+            /*
+            else if (gamepad2.x) {
+                autoLift(2);
+            }
+             */
+            /*
+            else if (gamepad2.y) {
+                autoLift(3);
             }
 
+             */
+
+            // grabber controls
+            if (gamepad2.right_trigger > 0) {
+                grabber.setPower(1);
+
+            } else if (gamepad2.left_trigger > 0) {
+                grabber.setPower(-1);
+
+            } /* else {
+                grabber.setPower(0);
+            }
+            */
 
         }
+    }
+
+    public void autoLift(int junctionHeight) {
+        final int pickUpConeHeight = 30;
+        final int groundJunctionHeight = 50;
+        final int lowJunctionHeight = 120;
+        //final int midJunctionHeight = 4;
+        // final double highJunctionHeight = 4;
+
+        int lift1Target = 0;
+        int lift2Target = 0;
+        int lift1Pos = lift1.getCurrentPosition();
+        int lift2Pos = lift2.getCurrentPosition();
+
+
+
+        lift1.setMode(DcMotor.RunMode.RUN_USING_ENCODERS);
+        lift2.setMode(DcMotor.RunMode.RUN_USING_ENCODERS);
+
+        lift1.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        lift2.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+
+        if (junctionHeight == 0) {
+            lift1Target = groundJunctionHeight;
+            lift2Target = groundJunctionHeight;
+        } else if (junctionHeight == 1) {
+            lift1Target = lowJunctionHeight;
+            lift2Target = lowJunctionHeight;
+        }
+        /*
+        else if (junctionHeight == 2) {
+            lift1Target = midJunctionHeight;
+            lift2Target = midJunctionHeight;
+        }
+         */
+        /*
+        else if (junctionHeight == 3) {
+            lift1Target = (int) (highJunctionHeight);
+            lift2Target = (int) (highJunctionHeight);
+        }
+         */
+
+        telemetry.addData("Target Junction Height:", junctionHeight);
+        telemetry.addData("Lift 1 Target:", lift1Target);
+        telemetry.addData("Lift 2 Target:", lift2Target);
+        telemetry.update();
+
+        lift1.setTargetPosition(lift1Target);
+        lift2.setTargetPosition(lift2Target);
+
+        lift1.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+        lift2.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+
+        runtime.reset();
+        while (runtime.seconds() < 10 && (lift1.isBusy() && lift2.isBusy())) {
+            lift1.setPower(1);
+            lift2.setPower(1);
+
+            telemetry.addData("Target Junction Height:", junctionHeight);
+            telemetry.addData("Lift 1 Target:", lift1Target);
+            telemetry.addData("Lift 2 Target:", lift2Target);
+            telemetry.addData("Lift 1 Power:", lift1.getPower());
+            telemetry.addData("Lift 2 Power:", lift2.getPower());
+            telemetry.update();
+        }
+
+        telemetry.addData("Lift 1 Power:", lift1.getPower());
+        telemetry.addData("Lift 2 Power:", lift2.getPower());
+        telemetry.update();
+
+        lift1.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        lift2.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+
+        lift1.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
+        lift2.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
+
+        // in the future, maybe replace this with PID?
+        lift1.setPower(0.5);
+        lift2.setPower(0.5);
+
     }
 }

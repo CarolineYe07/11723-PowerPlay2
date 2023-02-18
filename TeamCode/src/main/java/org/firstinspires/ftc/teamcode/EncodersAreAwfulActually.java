@@ -21,7 +21,7 @@ import org.firstinspires.ftc.robotcore.external.navigation.AxesReference;
 import org.firstinspires.ftc.robotcore.external.navigation.Orientation;
 
 @Autonomous
-public class EncodersVuforiaAuto extends LinearOpMode {
+public class EncodersAreAwfulActually extends LinearOpMode {
     // This is the current auto I think we're going to end up using
 
     private DcMotor lf, rf, lb, rb;
@@ -117,8 +117,8 @@ public class EncodersVuforiaAuto extends LinearOpMode {
         sleep(1000);
 
         int forward_dist = 27;
-        int strafe_dist = 26;
-        double speed = 0.75;
+        int strafe_dist = 27;
+        double speed = 0.5;
         int timeoutS = 30;
 
         while (opModeIsActive()) {
