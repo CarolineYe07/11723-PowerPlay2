@@ -11,17 +11,21 @@ import com.qualcomm.robotcore.util.ElapsedTime;
 @TeleOp
 public class FieldCentricTeleOp extends LinearOpMode {
 
-    public static final double ticksPerMotorRev = 560;
-    public static final double driveGearReduction = 0;
-    // public static final double wheelDiameterInches = 4;
+    public static final double ticksPerMotorRev = 1120;
+    public static final double gearReduction = 2;
+    public static final double ratio = ticksPerMotorRev / gearReduction;
+    public static final double ratio_to_top = ratio / 2;
     // public static final double ticksPerDriveInch = (ticksPerMotorRev * driveGearReduction) / (wheelDiameterInches * 3.14159265359);
 
     ElapsedTime runtime = new ElapsedTime();
+    public boolean isAutoLiftActive = false;
 
     private DcMotor motorFrontLeft, motorBackLeft, motorFrontRight, motorBackRight;
 
     private CRServo grabber;
     private DcMotor lift1, lift2;
+
+    public int currentJunctionHeight = 3;
 
     @Override
     public void runOpMode() throws InterruptedException {
@@ -56,26 +60,39 @@ public class FieldCentricTeleOp extends LinearOpMode {
         // Without this, data retrieving from the IMU throws an exception
         imu.initialize(parameters);
 
+        lift1.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        lift2.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+
         waitForStart();
 
         if (isStopRequested()) return;
 
         while (opModeIsActive()) {
-            double y = -gamepad1.left_stick_y; // Remember, this is reversed!
-            double x = gamepad1.left_stick_x * 1.1; // Counteract imperfect strafing
-            double rx = gamepad1.right_stick_x;
+            telemetry.addData("Lift 1 Pos:", lift1.getCurrentPosition());
+            telemetry.addData("Lift 2 Pos:", lift2.getCurrentPosition());
+            telemetry.update();
+            /*
+            telemetry.addData("Pick Up Cone Height", (int) Math.round(ratio_to_top * (5.0 / 26)));
+            telemetry.addData("Low Junction Height", (int) Math.round(ratio_to_top * (13.25 / 26)));
+            telemetry.update();
+             */
+            double y = -gamepad1.left_stick_y / 2; // Remember, this is reversed!
+            double x = gamepad1.left_stick_x * 1.1 / 2; // Counteract imperfect strafing
+            double rx = gamepad1.right_stick_x / 2;
 
             // Dead/safe zone so robot won't move when stick is only very slightly pressed
             // Only move at half power when stick is only pressed partway to allow for more precise movements
             // To be tested: different values for half power threshold
+            /*
             if (Math.abs(y) < 0.05) y = 0;
-            else if (Math.abs(y) < 0.25) y /= 2;
+            else if (Math.abs(y) < 0.5) y /= 2;
 
             if (Math.abs(x) < 0.05) x = 0;
-            else if (Math.abs(x) < 0.25) x /= 2;
+            else if (Math.abs(x) < 0.5) x /= 2;
 
             if (Math.abs(rx) < 0.05) rx = 0;
-            else if(Math.abs(rx) < 0.25) rx /= 2;
+            else if(Math.abs(rx) < 0.5) rx /= 2;
+             */
 
             // Read inverse IMU heading, as the IMU heading is CW positive
             double botHeading = -imu.getAngularOrientation().firstAngle;
@@ -98,93 +115,112 @@ public class FieldCentricTeleOp extends LinearOpMode {
             motorBackRight.setPower(backRightPower);
 
             // lift controls
-            double liftUp = 1;
-            double liftDown = -0.2;
+            double liftUp = 0.7;
+            double liftDown = -0.1;
 
             if (gamepad2.right_bumper) {
-                lift1.setPower(liftDown);
-                lift2.setPower(liftDown);
+                telemetry.addLine("right bumper pressed");
+                isAutoLiftActive = false;
+                // currentJunctionHeight = 3;
+                runtime.reset();
+                while (runtime.seconds() < 1) {
+                    lift1.setPower(liftDown);
+                    lift2.setPower(liftDown);
+                }
+                lift1.setPower(0);
+                lift2.setPower(0);
 
             } else if (gamepad2.left_bumper) {
+                telemetry.addLine("left bumper pressed");
+                isAutoLiftActive = false;
+                // currentJunctionHeight = 3;
                 lift1.setPower(liftUp);
                 lift2.setPower(liftUp);
 
-            } else {
-                lift1.setPower(0);
-                lift2.setPower(0);
+            }
+
+            if (isAutoLiftActive) {
+                switch (currentJunctionHeight) {
+                    case 0: lift1.setPower(0.1);
+                            lift2.setPower(0.1);
+                            telemetry.addData("Stabilizing Power working", lift1.getPower());
+                            telemetry.addData("Stabilizing Power working", lift1.getPower());
+                            telemetry.update();
+                            break;
+                    case 1: lift1.setPower(0.3);
+                            lift2.setPower(0.3);
+                            break;
+                    case 2: lift1.setPower(0.4);
+                            lift2.setPower(0.4);
+                            break;
+                    case 3: lift1.setPower(0);
+                            lift2.setPower(0);
+                            break;
+                }
             }
 
             if (gamepad2.a) {
                 autoLift(0);
             } else if (gamepad2.b) {
                 autoLift(1);
-            }
-            /*
-            else if (gamepad2.x) {
+            } else if (gamepad2.x) {
                 autoLift(2);
-            }
-             */
-            /*
-            else if (gamepad2.y) {
+            } else if (gamepad2.y) {
                 autoLift(3);
             }
 
-             */
-
             // grabber controls
             if (gamepad2.right_trigger > 0) {
+                telemetry.addLine("Right trigger");
+                telemetry.update();
                 grabber.setPower(1);
 
             } else if (gamepad2.left_trigger > 0) {
+                telemetry.addLine("Left trigger");
+                telemetry.update();
                 grabber.setPower(-1);
 
-            } /* else {
+            } else {
                 grabber.setPower(0);
             }
-            */
-
         }
+
     }
 
     public void autoLift(int junctionHeight) {
-        final int pickUpConeHeight = 30;
-        final int groundJunctionHeight = 50;
-        final int lowJunctionHeight = 120;
-        //final int midJunctionHeight = 4;
-        // final double highJunctionHeight = 4;
+        final int pickUpConeHeight = (int) Math.round(ratio_to_top * (5.0 / 26))-3;
+        // final int groundJunctionHeight = (int) ratio / 7 - 10;
+        final int lowJunctionHeight = (int) Math.round(ratio_to_top * (13.25 / 26));
+        final int midJunctionHeight = (int) ratio / 3;
+        final int highJunctionHeight = (int) ratio_to_top;
+
+        isAutoLiftActive = true;
 
         int lift1Target = 0;
         int lift2Target = 0;
         int lift1Pos = lift1.getCurrentPosition();
         int lift2Pos = lift2.getCurrentPosition();
 
-
+        telemetry.addData("Lift 1 Pos:", lift1Pos);
+        telemetry.addData("Lift 2 Pos:", lift2Pos);
+        telemetry.update();
 
         lift1.setMode(DcMotor.RunMode.RUN_USING_ENCODERS);
         lift2.setMode(DcMotor.RunMode.RUN_USING_ENCODERS);
 
-        lift1.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
-        lift2.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
-
         if (junctionHeight == 0) {
-            lift1Target = groundJunctionHeight;
-            lift2Target = groundJunctionHeight;
+            lift1Target = pickUpConeHeight;
+            lift2Target = pickUpConeHeight;
         } else if (junctionHeight == 1) {
             lift1Target = lowJunctionHeight;
             lift2Target = lowJunctionHeight;
-        }
-        /*
-        else if (junctionHeight == 2) {
+        } else if (junctionHeight == 2) {
             lift1Target = midJunctionHeight;
             lift2Target = midJunctionHeight;
+        } else if (junctionHeight == 3) {
+            lift1Target = highJunctionHeight;
+            lift2Target = highJunctionHeight;
         }
-         */
-        /*
-        else if (junctionHeight == 3) {
-            lift1Target = (int) (highJunctionHeight);
-            lift2Target = (int) (highJunctionHeight);
-        }
-         */
 
         telemetry.addData("Target Junction Height:", junctionHeight);
         telemetry.addData("Lift 1 Target:", lift1Target);
@@ -198,13 +234,20 @@ public class FieldCentricTeleOp extends LinearOpMode {
         lift2.setMode(DcMotor.RunMode.RUN_TO_POSITION);
 
         runtime.reset();
-        while (runtime.seconds() < 10 && (lift1.isBusy() && lift2.isBusy())) {
-            lift1.setPower(1);
-            lift2.setPower(1);
+        while (runtime.seconds() < 3 && (lift1.isBusy() && lift2.isBusy())) {
+            if (lift1Pos < lift1Target && lift2Pos < lift2Target) {
+                lift1.setPower(0.8);
+                lift2.setPower(0.8);
+            } else {
+                lift1.setPower(0);
+                lift2.setPower(0);
+            }
 
             telemetry.addData("Target Junction Height:", junctionHeight);
             telemetry.addData("Lift 1 Target:", lift1Target);
             telemetry.addData("Lift 2 Target:", lift2Target);
+            telemetry.addData("Lift 1 Current Pos:", lift1.getCurrentPosition());
+            telemetry.addData("Lift 2 Current Pos:", lift2.getCurrentPosition());
             telemetry.addData("Lift 1 Power:", lift1.getPower());
             telemetry.addData("Lift 2 Power:", lift2.getPower());
             telemetry.update();
@@ -214,15 +257,21 @@ public class FieldCentricTeleOp extends LinearOpMode {
         telemetry.addData("Lift 2 Power:", lift2.getPower());
         telemetry.update();
 
-        lift1.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
-        lift2.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
-
-        lift1.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
-        lift2.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
+        // lift1.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
+        // lift2.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
 
         // in the future, maybe replace this with PID?
-        lift1.setPower(0.5);
-        lift2.setPower(0.5);
-
+        switch (junctionHeight) {
+            case 0: currentJunctionHeight = 0;
+                    break;
+            case 1: currentJunctionHeight = 1;
+                    break;
+            case 2: currentJunctionHeight = 2;
+                    break;
+            case 3: currentJunctionHeight = 3;
+                    break;
+        }
+        // lift1.setPower(0);
+        // lift2.setPower(0);
     }
 }

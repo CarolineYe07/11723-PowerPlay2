@@ -85,8 +85,8 @@ public class FieldCentricTeleOpOld extends LinearOpMode {
             motorBackRight.setPower(backRightPower);
 
             // lift controls
-            double liftUp = 1;
-            double liftDown = 0.2;
+            double liftUp = 0.7;
+            double liftDown = 1;
 
             if (gamepad2.right_bumper) {
                 lift1.setPower(liftDown);
