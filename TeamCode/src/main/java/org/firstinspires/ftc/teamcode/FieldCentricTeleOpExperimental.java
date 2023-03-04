@@ -1,16 +1,26 @@
 package org.firstinspires.ftc.teamcode;
 
 import com.qualcomm.hardware.bosch.BNO055IMU;
-import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.CRServo;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorSimple;
+import com.qualcomm.robotcore.util.ElapsedTime;
 
 @TeleOp
-@Disabled
-public class FieldCentricTeleOpOneMotor extends LinearOpMode {
+public class FieldCentricTeleOpExperimental extends LinearOpMode {
+    public static final double ticksPerMotorRev = 1120;
+    public static final double gearReduction = 2;
+    public static final double ratio = ticksPerMotorRev / gearReduction;
+    public static final double ratio_to_top = ratio / 2;
+
+    public DcMotor lift1, lift2;
+
+    ElapsedTime runtime = new ElapsedTime();
+
+    boolean stopLift = false;
+
     @Override
     public void runOpMode() throws InterruptedException {
         // Declare our motors
@@ -21,8 +31,8 @@ public class FieldCentricTeleOpOneMotor extends LinearOpMode {
         DcMotor motorBackRight = hardwareMap.dcMotor.get("RB");
 
         CRServo grabber = hardwareMap.crservo.get("grabber");
-        DcMotor lift1 = hardwareMap.dcMotor.get("lift1");
-        //DcMotor lift2 = hardwareMap.dcMotor.get("lift2");
+        lift1 = hardwareMap.dcMotor.get("lift1");
+        lift2 = hardwareMap.dcMotor.get("lift2");
 
         // Reverse the right side motors
         // Reverse left motors if you are using NeveRests
@@ -35,8 +45,8 @@ public class FieldCentricTeleOpOneMotor extends LinearOpMode {
         motorBackLeft.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
 
         lift1.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        lift2.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
         lift1.setDirection(DcMotorSimple.Direction.REVERSE);
-        //lift2.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
 
         // Retrieve the IMU from the hardware map
         BNO055IMU imu = hardwareMap.get(BNO055IMU.class, "imu");
@@ -45,6 +55,13 @@ public class FieldCentricTeleOpOneMotor extends LinearOpMode {
         parameters.angleUnit = BNO055IMU.AngleUnit.RADIANS;
         // Without this, data retrieving from the IMU throws an exception
         imu.initialize(parameters);
+
+        // Deal with encoder nonsense hopefully?
+        lift1.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        lift2.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+
+        lift1.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        lift2.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
 
         waitForStart();
 
@@ -87,18 +104,41 @@ public class FieldCentricTeleOpOneMotor extends LinearOpMode {
             motorFrontRight.setPower(frontRightPower);
             motorBackRight.setPower(backRightPower);
 
-            // lift controls
-            double liftUp = 1;
-            double liftDown = -0.3;
+            // lift controls LOL
+            double liftUp = 0.7;
+            double liftDown = -0.1;
 
             if (gamepad2.right_bumper) {
-                lift1.setPower(liftDown);
+                stopLift = false;
+                runtime.reset();
+                while (runtime.seconds() < 1) {
+                    lift1.setPower(liftDown);
+                    lift2.setPower(liftDown);
+                }
+                lift1.setPower(0);
+                lift2.setPower(0);
 
             } else if (gamepad2.left_bumper) {
+                stopLift = false;
                 lift1.setPower(liftUp);
+                lift2.setPower(liftUp);
 
-            } else {
+            } else if (!stopLift) {
                 lift1.setPower(0);
+                lift2.setPower(0);
+            }
+
+            // automatic lift controls... hopefully?
+            if (gamepad2.a) {
+                autoLift(0);
+            } else if (gamepad2.b) {
+                autoLift(1);
+            } else if (gamepad2.x) {
+                autoLift(2);
+            }
+            if (stopLift) {
+                lift1.setPower(0.1);
+                lift2.setPower(0.1);
             }
 
             // grabber controls
@@ -113,7 +153,63 @@ public class FieldCentricTeleOpOneMotor extends LinearOpMode {
             }
 
 
-            // Had to make a random edit to test something
+        }
+    }
+
+    public void autoLift(int junctionHeight) {
+        final int pickUpConeHeight = (int) Math.round(ratio_to_top * (5.0 / 26))-10;
+        final int lowJunctionHeight = (int) Math.round(ratio_to_top * (13.25 / 26) + 5);
+        final int midJunctionHeight = (int) ratio_to_top + 5;
+
+        int lift1Target = 0;
+        int lift2Target = 0;
+        int lift1Pos = lift1.getCurrentPosition();
+        int lift2Pos = lift2.getCurrentPosition();
+
+        switch (junctionHeight) {
+            case 0:
+                lift1Target = pickUpConeHeight;
+                lift2Target = pickUpConeHeight;
+            case 1:
+                lift1Target = lowJunctionHeight;
+                lift2Target= lowJunctionHeight;
+            case 2:
+                lift1Target = midJunctionHeight;
+                lift2Target = midJunctionHeight;
+        }
+
+        lift1.setTargetPosition(lift1Target);
+        lift2.setTargetPosition(lift2Target);
+
+        lift1.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+        lift2.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+
+        runtime.reset();
+        while (runtime.seconds() < 3 && !(lift1.isBusy() && lift2.isBusy())) {
+            if (lift1Pos < lift1Target && lift2Pos < lift2Target) {
+                lift1.setPower(0.8);
+                lift2.setPower(0.8);
+            } else if (lift1Pos > lift1Target && lift2Pos > lift2Target) {
+                lift1.setPower(0);
+                lift2.setPower(0);
+            } else {
+                lift1.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
+                lift2.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
+                telemetry.addData("Something's not right, here's lift 1:", lift1Pos);
+                telemetry.addData("Switch to manual controls, lift 2:", lift1Pos);
+                telemetry.update();
+                break;
+            }
+
+            telemetry.addData("Target Junction Height:", junctionHeight);
+            telemetry.addData("Lift 1 Target:", lift1Target);
+            telemetry.addData("Lift 2 Target:", lift2Target);
+            telemetry.addData("Lift 1 Current Pos:", lift1.getCurrentPosition());
+            telemetry.addData("Lift 2 Current Pos:", lift2.getCurrentPosition());
+            telemetry.addData("Lift 1 Power:", lift1.getPower());
+            telemetry.addData("Lift 2 Power:", lift2.getPower());
+            telemetry.update();
         }
     }
 }
+

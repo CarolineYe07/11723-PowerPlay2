@@ -34,6 +34,7 @@ public class FieldCentricTeleOpOld extends LinearOpMode {
 
         lift1.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
         lift2.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        lift1.setDirection(DcMotorSimple.Direction.REVERSE);
 
         // Retrieve the IMU from the hardware map
         BNO055IMU imu = hardwareMap.get(BNO055IMU.class, "imu");
@@ -86,14 +87,14 @@ public class FieldCentricTeleOpOld extends LinearOpMode {
 
             // lift controls
             double liftUp = 0.7;
-            double liftDown = 1;
+            double liftDown = -0.1;
 
             if (gamepad2.right_bumper) {
                 lift1.setPower(liftDown);
-                lift2.setPower(-liftDown);
+                lift2.setPower(liftDown);
 
             } else if (gamepad2.left_bumper) {
-                lift1.setPower(-liftUp);
+                lift1.setPower(liftUp);
                 lift2.setPower(liftUp);
 
             } else {
