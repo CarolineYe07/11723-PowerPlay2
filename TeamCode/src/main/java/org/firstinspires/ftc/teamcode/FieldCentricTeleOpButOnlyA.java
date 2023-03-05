@@ -35,10 +35,14 @@ public class FieldCentricTeleOpButOnlyA extends LinearOpMode {
     public void runOpMode() throws InterruptedException {
         // Declare our motors
         // Make sure your ID's match your configuration
-        motorFrontLeft = hardwareMap.dcMotor.get("motorFrontLeft");
-        motorBackLeft = hardwareMap.dcMotor.get("motorBackLeft");
-        motorFrontRight = hardwareMap.dcMotor.get("motorFrontRight");
-        motorBackRight = hardwareMap.dcMotor.get("motorBackRight");
+        motorFrontLeft = hardwareMap.dcMotor.get("LF");
+        motorBackLeft = hardwareMap.dcMotor.get("LB");
+        motorFrontRight = hardwareMap.dcMotor.get("RF");
+        motorBackRight = hardwareMap.dcMotor.get("RB");
+
+        grabber = hardwareMap.crservo.get("grabber");
+        lift1 = hardwareMap.dcMotor.get("lift1");
+        lift2 = hardwareMap.dcMotor.get("lift2");
 
         // Reverse the right side motors
         // Reverse left motors if you are using NeveRests
@@ -161,7 +165,7 @@ public class FieldCentricTeleOpButOnlyA extends LinearOpMode {
         lift2.setMode(DcMotor.RunMode.RUN_TO_POSITION);
 
         runtime.reset();
-        while (runtime.seconds() < 3 && !(lift1.isBusy() && lift2.isBusy())) {
+        while (runtime.seconds() < 3 && (lift1.isBusy() && lift2.isBusy())) {
             lift1.setPower(0.8);
             lift2.setPower(0.8);
 

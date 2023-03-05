@@ -1,6 +1,7 @@
 package org.firstinspires.ftc.teamcode;
 
 import com.qualcomm.hardware.bosch.BNO055IMU;
+import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.CRServo;
@@ -9,6 +10,7 @@ import com.qualcomm.robotcore.hardware.DcMotorSimple;
 import com.qualcomm.robotcore.util.ElapsedTime;
 
 @TeleOp
+@Disabled
 public class FieldCentricTeleOp extends LinearOpMode {
 
     public static final double ticksPerMotorRev = 1120;
@@ -234,7 +236,7 @@ public class FieldCentricTeleOp extends LinearOpMode {
         lift2.setMode(DcMotor.RunMode.RUN_TO_POSITION);
 
         runtime.reset();
-        while (runtime.seconds() < 3 && !(lift1.isBusy() && lift2.isBusy())) {
+        while (runtime.seconds() < 3 && (lift1.isBusy() && lift2.isBusy())) {
             if (lift1Pos < lift1Target && lift2Pos < lift2Target) {
                 lift1.setPower(0.8);
                 lift2.setPower(0.8);
