@@ -91,17 +91,14 @@ public class FieldCentricTeleOpButNoEncoder extends LinearOpMode {
 
             // lift controls
             double liftUp = 0.8;
-            double liftDown = -0.3;
+            double liftDown = -0.2;
 
             if (gamepad2.right_bumper) {
                 telemetry.addLine("right bumper");
                 runtime.reset();
-                while (runtime.seconds() < 2) {
-                    telemetry.addLine("while loop is indeed working");
+                while (runtime.seconds() < 1) {
                     lift1.setPower(liftDown);
                     lift2.setPower(liftDown);
-                    telemetry.addData("Motor power 1 while", lift1.getPower());
-                    telemetry.addData("Motor power 2 while", lift1.getPower());
                 }
 
                 telemetry.addData("Motor power 1", lift1.getPower());
@@ -121,10 +118,12 @@ public class FieldCentricTeleOpButNoEncoder extends LinearOpMode {
 
             // grabber controls
             if (gamepad2.right_trigger > 0) {
-                grabber.setPower(0.5);
+                grabber.setPower(1);
+                telemetry.addLine("right trigger");
+                telemetry.update();
 
             } else if (gamepad2.left_trigger > 0) {
-                grabber.setPower(-0.5);
+                grabber.setPower(-1);
 
             } else {
                 grabber.setPower(0);
